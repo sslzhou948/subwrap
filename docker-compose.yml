@@ -1,0 +1,28 @@
+services:
+  subwrap:
+    # 从 GHCR 拉取预构建镜像，群晖上不用自己 build
+    image: ghcr.io/sslzhou948/subwrap:latest
+    container_name: subwrap
+    restart: unless-stopped
+    ports:
+      # 18080 -> 转发服务（给 NPM 反代，对外提供订阅）
+      - "18080:8080"
+      # 18081 -> Web 管理界面（只在内网访问，不要在 NPM 里反代！）
+      - "18081:8081"
+    environment:
+      # 分享 token：决定分享链接；之后可在 Web 界面里一键重新生成（.env 仅用于首次启动）
+      - SUB_TOKEN=${SUB_TOKEN}
+      # 上游订阅地址：务必填写 VPS 的 Tailscale 地址（如 http://100.x.x.x:端口/路径），
+      # 明文 HTTP 只走 Tailscale 加密隧道，不经过公网。
+      # !!! 此值含账号密码，只填在群晖本机，绝不外传 !!!
+      - UPSTREAM_URL=${UPSTREAM_URL}
+      # Web 管理界面的登录密码（首次启动用，之后可在界面里改；不填则禁用管理界面）
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      # 公网域名（选填，如 https://sub.example.com），仅用于在管理界面拼接显示完整分享链接
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
+      - LISTEN_PORT=8080
+      - ADMIN_PORT=8081
+    volumes:
+      # 配置持久化：首次启动后，token/上游地址/管理密码改为存于 ./data/config.json，
+      # 在 Web 界面修改即时生效，不用再改 .env 重建容器
+      - ./data:/data
