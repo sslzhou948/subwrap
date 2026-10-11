@@ -11,6 +11,7 @@
   - 首次启动从环境变量读取配置并持久化到 /data/config.json，之后在网页里改。
 """
 
+import base64
 import hashlib
 import hmac
 import html
@@ -25,7 +26,7 @@ import time
 import zlib
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 try:
@@ -199,7 +200,24 @@ MAX_UPSTREAM_BYTES = 8 * 1024 * 1024  # 订阅 YAML 很小，超过 8MB 视为�
 
 def fetch_upstream(timeout=FETCH_TIMEOUT, url=None):
     target = url or get_config()["upstream_url"]
-    req = Request(target, headers={"User-Agent": "subwrap/1.0"})
+    headers = {"User-Agent": "subwrap/1.0"}
+    parts = urlsplit(target)
+    if parts.username:
+        # http.client 会把 user:pass@host 中的 "pass@host" 误判为端口
+        # （InvalidURL: nonnumeric port），故把 userinfo 剥离改走 Authorization 头。
+        creds = unquote(parts.username)
+        if parts.password is not None:
+            creds += ":" + unquote(parts.password)
+        headers["Authorization"] = "Basic " + base64.b64encode(
+            creds.encode("utf-8")).decode("ascii")
+        host = parts.hostname or ""
+        if ":" in host:  # IPv6 还原方括号
+            host = f"[{host}]"
+        if parts.port:
+            host += f":{parts.port}"
+        target = urlunsplit((parts.scheme, host, parts.path,
+                             parts.query, parts.fragment))
+    req = Request(target, headers=headers)
     t0 = time.time()
     with urlopen(req, timeout=timeout) as resp:
         body = resp.read(MAX_UPSTREAM_BYTES + 1)
