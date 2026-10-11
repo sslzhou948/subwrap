@@ -423,6 +423,10 @@ class AdminHandler(BaseHTTPRequestHandler):
     # ---------- 路由 ----------
     def do_GET(self):  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/":
+            # 裸地址直接跳登录页，符合常规网站习惯
+            self._redirect("/admin")
+            return
         if not admin_enabled():
             self._send_html(200, _render(LOGIN_PAGE,
                 csrf="", err="管理界面未启用：请在 .env 设置 ADMIN_PASSWORD 后重启容器。"))
