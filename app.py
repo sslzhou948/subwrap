@@ -336,7 +336,7 @@ VPS 的真实域名、IP、账号密码不出现在任何分享链接里。<br>
 <h3>使用说明</h3>
 1. 一人一链：每人新建一条带备注的专属链接发给对应的人，不要多人共用，否则无法单独吊销。<br>
 2. 链接 token 为 8 位随机字符（如 `https://域名/s/aB3xK9qZ`），已足够短；换 token 会重新生成 8 位。<br>
-3. 二维码分享：每条链接旁有点「二维码」按钮，打开后长按/右键保存图片发给对方，对方扫码即可导入（需先在「上游订阅」里填好公网域名）。<br>
+3. 二维码分享：每条链接旁点「二维码」按钮弹窗查看，可点「保存二维码」下载图片发给对方，对方扫码即可导入（需先在「上游订阅」里填好公网域名）。<br>
 4. 想断掉某人：点「禁用」（链接立即变 404）；想换发：点「换 token」（旧链接立即失效）；不用了就「删除」。<br>
 5. 上游订阅地址变更（如 VPS 账号密码换了）：在「上游订阅」里修改保存即时生效，可先用「测试连通」验证。<br>
 6. 「公网域名」只用于拼接展示分享链接和生成二维码，选填，不影响转发。<br>
@@ -378,7 +378,30 @@ spellcheck="false"></div>
 <div class="row"><input type="password" name="new_password" placeholder="新管理密码（≥8 位）">
 <button type="submit">修改</button></div></form></div>
 </div>
+<div id="qrmodal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;align-items:center;justify-content:center" onclick="if(event.target===this)closeQr()">
+<div style="background:#1e1e1e;border:1px solid #444;border-radius:10px;padding:24px;text-align:center;max-width:92vw">
+<h3 id="qrtitle" style="margin:0 0 12px"></h3>
+<img id="qrimg" src="" style="width:min(72vw,300px);image-rendering:pixelated;background:#fff;padding:10px;border-radius:6px" alt="qrcode">
+<div style="margin-top:14px;display:flex;gap:10px;justify-content:center">
+<button type="button" onclick="document.getElementById('qrsave').click()">保存二维码</button>
+<button type="button" class="ghost" onclick="closeQr()">关闭</button>
+</div><a id="qrsave" href="" download="" style="display:none"></a>
+</div></div>
 <script>
+function copyText(btn){
+var t=btn.getAttribute('data-url');
+function done(ok){var o=btn.textContent;btn.textContent=ok?'已复制':'复制失败';setTimeout(function(){btn.textContent='复制';},1200);}
+function fallback(){var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{done(document.execCommand('copy'));}catch(e){done(false);}document.body.removeChild(ta);}
+if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){done(true);},function(){fallback();});}else{fallback();}
+}
+function showQr(btn){
+var lid=btn.getAttribute('data-lid'),label=btn.getAttribute('data-label');
+document.getElementById('qrimg').src='/admin/qr/'+lid+'/png';
+document.getElementById('qrtitle').textContent='「'+label+'」的二维码';
+var a=document.getElementById('qrsave');a.href='/admin/qr/'+lid+'/png';a.download='qrcode-'+lid+'.png';
+document.getElementById('qrmodal').style.display='flex';
+}
+function closeQr(){document.getElementById('qrmodal').style.display='none';}
 function probe(){var el=document.getElementById('probe');el.textContent='测试中…';
 var u=document.getElementById('upstream_url').value;
 fetch('/admin/api/probe',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
@@ -619,14 +642,14 @@ class AdminHandler(BaseHTTPRequestHandler):
             linkrows += (
                 f'<tr><td>{html.escape(l.get("label", ""))}</td>'
                 f'<td><span class="link">{html.escape(url)}</span> '
-                f'<button class="ghost" style="padding:4px 8px" '
-                f'onclick="navigator.clipboard.writeText(\'{html.escape(url)}\')">复制</button></td>'
+                f'<button class="ghost" style="padding:4px 8px" type="button" '
+                f'data-url="{html.escape(url)}" onclick="copyText(this)">复制</button></td>'
                 f'<td>{status}<br><span class="muted">{html.escape(l.get("created", ""))}</span></td>'
                 f'<td><form method="post" action="/admin/links/{lid}/toggle" style="display:inline">'
                 f'<input type="hidden" name="csrf" value="{csrf}">'
                 f'<button class="ghost" style="padding:4px 8px" type="submit">{toggle_label}</button></form> '
-                f'<a href="/admin/qr/{lid}" target="_blank" style="text-decoration:none">'
-                f'<button class="ghost" style="padding:4px 8px" type="button">二维码</button></a> '
+                f'<button class="ghost" style="padding:4px 8px" type="button" data-lid="{lid}" '
+                f'data-label="{html.escape(l.get("label", ""))}" onclick="showQr(this)">二维码</button> '
                 f'<form method="post" action="/admin/links/{lid}/regen" style="display:inline" '
                 f'onsubmit="return confirm(\'换 token 后此人旧链接立即失效，继续？\')">'
                 f'<input type="hidden" name="csrf" value="{csrf}">'
