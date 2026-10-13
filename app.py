@@ -241,7 +241,10 @@ class ForwardHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         if filename:
-            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            # 文件名不加引号：部分客户端解析 Content-Disposition 时会把引号
+            # 当作文件名的一部分，导致订阅名显示成 \"sub.yaml\ 这类乱码。
+            # sub.yaml 全为 token 合法字符，不加引号符合 RFC 6266。
+            self.send_header("Content-Disposition", f"attachment; filename={filename}")
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
